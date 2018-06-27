@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Calculator</title>
+
+  <!-- CSS styles -->
+
+  <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+
+  <style>
+
+    /* Main pane */
+
+    .branding-below {
+      bottom: 56px;
+      top: 0;
+    }
+
+
+    /* Form */
+
+    form input.inline {
+      width: 170px;
+      height: unset;
+      padding: 7px;
+      font-size: 120%;
+    }
+
+
+    /* Table */
+
+    table {
+      width: 100%;
+    }
+
+    tr {
+      transition: .5s;
+    }
+
+    tr.selected {
+      background-color: #eee;
+    }
+
+
+    /* Copy button */
+
+    .btn-copy,
+    .btn-delete {
+      cursor: pointer;
+      width: 30px;
+      text-align: center;
+    }
+
+    .btn-copy img,
+    .btn-delete img {
+      width: 25px;
+      opacity: .4;
+      transition: .5s;
+    }
+
+    .btn-copy:hover img,
+    .btn-delete:hover img {
+      transform: scale(1.25);
+      opacity: .7;
+    }
+
+
+    /* Toast */
+    #toast {
+      visibility: hidden;
+      min-width: 200px;
+      margin-left: -116px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 2px;
+      padding: 16px;
+      position: fixed;
+      z-index: 1;
+      left: 50%;
+      bottom: 85px;
+      font-size: 17px;
+    }
+
+    #toast.show {
+      visibility: visible;
+      -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
+      animation: fadein 0.5s, fadeout 0.5s 2.5s;
+    }
+
+    @-webkit-keyframes fadein {
+      from {bottom: 55px; opacity: 0;} 
+      to {bottom: 85px; opacity: 1;}
+    }
+    @keyframes fadein {
+      from {bottom: 55px; opacity: 0;}
+      to {bottom: 85px; opacity: 1;}
+    }
+    @-webkit-keyframes fadeout {
+      from {bottom: 85px; opacity: 1;} 
+      to {bottom: 55px; opacity: 0;}
+    }
+    @keyframes fadeout {
+      from {bottom: 85px; opacity: 1;}
+      to {bottom: 55px; opacity: 0;}
+    }
+
+  </style>
+
+
+</head>
+<body>
+
+  <!-- html elements -->
+
+  <div class="sidebar branding-below">
+
+    <div class="block">
+      <form>
+        <input type="text" class="inline" required>
+        <button class="inline action">Calc</button>
+      </form>
+    </div>
+  
+    <div class="block">
+      <table></table>
+    </div>
+
+  </div>
+  
+  <div class="sidebar bottom">
+
+    <button onclick="clearEquations()">Clear</button>
+
+  </div>
+
+  <div id="toast"></div>
+
+
+  <!-- Javascript functions -->
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+
+  <script>
+
+    var equations = [];
+
+    loadData();
+    
+
+    $('form').submit((e) => {
+      e.preventDefault();
+
+      var equation = new Object();
+
+      equation.expression = $('form input').val();
+      equation.answer = eval(equation.expression);
+      equation.code = equations.length > 0 ? equations[equations.length - 1].code + 1 : 0;
+
+      addEquation(equation);
+
+      $('form')[0].reset();
+    });
+
+    $('table').on('click', 'tr', function() {
+      
+      $('table tr').removeClass('selected');
+      $(this).addClass('selected');
+
+    });
+
+
+    $('table').on('click', '.expression, .answer', function() {
+      
+      console.log('clicked!');
+
+    });
+
+
+    function addEquation(equation) {
+
+      appendHtml(equation);
+
+      equations.push(equation);
+
+      google.script.run.setData(equations);
+    }
+
+
+    function appendHtml(equation) {
+
+      $('table').prepend(
+        '<tr class="equation" code=' + equation.code + '>' +
+          '<td class = "expression">' + equation.expression + '</td>' +
+          '<td class = "answer">' + equation.answer + '</td>' +
+          '<td class = "btn-copy" onclick = "copyResult()">' +
+            '<img src="https://png.icons8.com/material/50/000000/copy.png" alt="Icon">' +
+          '</td>' +
+          '<td class = "btn-delete" onclick = "removeItem(this)">' +
+            '<img src="https://png.icons8.com/material/2x/waste.png" alt="Icon">' +
+          '</td>' +
+        '</tr>'
+      );
+    }
+
+    function loadData() {
+      google.script.run.withSuccessHandler(function(data) {
+        if (!data) return;
+
+        // Load data from Google properties
+        equations = data;
+        equations.forEach(function(equation) {
+          appendHtml(equation);
+        });
+      })
+      .getData();
+    }
+
+
+    function clearEquations() {
+
+      equations = [];
+
+      google.script.run.clearData();
+
+      $('table').empty();
+    }
+
+
+    function copyResult() {
+
+      var answer = $(this).prev().html();
+
+      // Copy to clipboard
+      const el = document.createElement('textarea');
+      el.value = answer;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+
+      showToast('Copied!');
+    }
+
+
+    function removeItem(e) {
+
+      var parentElement = $(e).parent();
+      var code = $(parentElement).attr('code');
+
+      $(parentElement).remove();
+
+      equations = equations.filter(e => e.code != code);
+      google.script.run.setData(equations);
+
+      showToast('Deleted!');
+    }
+
+
+    function showToast(text) {
+
+      var x = document.getElementById('toast');
+      x.className = 'show';
+      x.innerHTML = text;
+
+      setTimeout(function() {
+        x.className = x.className.replace('show', '');
+      }, 3000);
+    }
+
+  </script>
+
+</body>
+</html>
